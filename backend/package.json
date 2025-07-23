@@ -1,0 +1,33 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "AI concierge app",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "type": "module",
+  "dependencies": {
+    "@google/generative-ai": "^0.24.1",
+    "@langchain/community": "^0.3.49",
+    "@langchain/google-genai": "^0.2.15",
+    "cors": "^2.8.5",
+    "dotenv": "^16.6.1",
+    "express": "^4.18.2",
+    "faiss-node": "^0.5.1",
+    "helmet": "^7.1.0",
+    "langchain": "^0.3.30",
+    "mongoose": "^8.1.1",
+    "node-cron": "^3.0.3",
+    "openai": "^4.20.1",
+    "socket.io": "^4.8.1",
+    "twilio": "^5.7.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
