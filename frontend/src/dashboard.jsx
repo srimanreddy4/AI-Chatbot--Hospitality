@@ -49,20 +49,29 @@ function AssistanceCard({ request }) {
 }
 
 // Proactive messaging section for guest engagement
+
+// --- Simplified GuestSessions component ---
 function GuestSessions() {
-  const sessions = [
-    { sessionId: "guest_room_101", name: "Guest (Room 101)" },
-    { sessionId: "guest_room_205", name: "Guest (Room 205)" },
-    { sessionId: "guest_vip_suite", name: "Guest (VIP Suite)" },
-  ];
+  const [sessions, setSessions] = useState([]);
+
+  // This now shows the session ID of the user who is actually using the chat
+  useEffect(() => {
+    const currentSessionId = localStorage.getItem("sessionId");
+    if (currentSessionId) {
+      setSessions([{ sessionId: currentSessionId, name: "Current Guest" }]);
+    }
+  }, []);
 
   const handlePing = async (sessionId, promptType) => {
     try {
-      await fetch("http://localhost:3000/api/proactive-ping", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, promptType }),
-      });
+      await fetch(
+        "https://ai-chatbot-hospitality-backend.onrender.com/api/proactive-ping",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId, promptType }),
+        },
+      );
       alert(
         `Ping ('${promptType}') sent to session: ${sessionId.substring(0, 8)}...`,
       );
@@ -78,34 +87,42 @@ function GuestSessions() {
         Proactive Guest Reminders
       </h2>
       <div className="space-y-4">
-        {sessions.map((session) => (
-          <div
-            key={session.sessionId}
-            className="flex justify-between items-center bg-slate-50 p-3 rounded-lg"
-          >
-            <p className="text-slate-600 font-mono text-sm">
-              <span className="font-bold text-slate-800">{session.name}</span>
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() =>
-                  handlePing(session.sessionId, "checkout_reminder")
-                }
-                className="bg-sky-500 text-white px-4 py-2 text-sm font-semibold rounded-lg shadow-sm hover:bg-sky-600 transition-colors"
-              >
-                Send Checkout Reminder
-              </button>
-              <button
-                onClick={() =>
-                  handlePing(session.sessionId, "appointment_reminder")
-                }
-                className="bg-indigo-500 text-white px-4 py-2 text-sm font-semibold rounded-lg shadow-sm hover:bg-indigo-600 transition-colors"
-              >
-                Send Spa Reminder
-              </button>
+        {sessions.length > 0 ? (
+          sessions.map((session) => (
+            <div
+              key={session.sessionId}
+              className="flex justify-between items-center bg-slate-50 p-3 rounded-lg"
+            >
+              <p className="text-slate-600 font-mono text-sm">
+                <span className="font-bold text-slate-800">{session.name}</span>
+                : {session.sessionId.substring(0, 8)}...
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() =>
+                    handlePing(session.sessionId, "checkout_reminder")
+                  }
+                  className="bg-sky-500 text-white px-4 py-2 text-sm font-semibold rounded-lg shadow-sm hover:bg-sky-600 transition-colors"
+                >
+                  Send Checkout Reminder
+                </button>
+                <button
+                  onClick={() =>
+                    handlePing(session.sessionId, "appointment_reminder")
+                  }
+                  className="bg-indigo-500 text-white px-4 py-2 text-sm font-semibold rounded-lg shadow-sm hover:bg-indigo-600 transition-colors"
+                >
+                  Send Spa Reminder
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        ) : (
+          <p className="text-slate-500">
+            No active guest session found. Open the chat in this browser to see
+            it here.
+          </p>
+        )}
       </div>
     </div>
   );
@@ -179,14 +196,17 @@ function RequestCard({ request, onUpdateStatus }) {
 function Dashboard() {
   const [requests, setRequests] = useState([]);
   const [assistanceRequests, setAssistanceRequests] = useState([]);
-  
+
   const handleUpdateStatus = async (id, newStatus) => {
     try {
-      await fetch(`http://localhost:3000/api/services/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      });
+      await fetch(
+        `https://ai-chatbot-hospitality-backend.onrender.com/api/services/${id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: newStatus }),
+        },
+      );
     } catch (error) {
       console.error("Failed to update status:", error);
     }
@@ -196,7 +216,9 @@ function Dashboard() {
     // Load initial requests when dashboard opens
     const fetchInitialRequests = async () => {
       try {
-        const response = await fetch("http://localhost:3000/api/services");
+        const response = await fetch(
+          "https://ai-chatbot-hospitality-backend.onrender.com/api/services",
+        );
         const data = await response.json();
         setRequests(data);
       } catch (error) {
@@ -206,7 +228,7 @@ function Dashboard() {
     fetchInitialRequests();
 
     // Set up real-time socket connection
-    const socket = io("http://localhost:3000");
+    const socket = io("https://ai-chatbot-hospitality-backend.onrender.com");
     socket.on("connect", () =>
       console.log("Socket connected successfully!", socket.id),
     );
@@ -256,7 +278,7 @@ function Dashboard() {
             ))}
           </div>
         )}
-        
+
         <GuestSessions />
 
         {/* Request columns organized by status */}

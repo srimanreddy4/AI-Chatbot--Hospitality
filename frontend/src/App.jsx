@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react"; // 1. Import useCallback
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import Dashboard from "./dashboard.jsx";
 import LandingPage from "./landingpage.jsx";
 import { io } from "socket.io-client";
 
-// Custom SVG icons for the chat interface
+// --- Helper Icons and ChatMessage component (unchanged) ---
 const MicIcon = ({ isListening }) => (
   <svg
     className={`w-6 h-6 transition-colors ${isListening ? "text-red-500 animate-pulse" : "text-gray-500 hover:text-blue-600"}`}
@@ -21,7 +21,6 @@ const MicIcon = ({ isListening }) => (
     />
   </svg>
 );
-
 const SpeakerIcon = ({ isMuted }) => (
   <svg
     className="w-6 h-6 text-slate-400"
@@ -47,7 +46,6 @@ const SpeakerIcon = ({ isMuted }) => (
     )}
   </svg>
 );
-
 const SendIcon = () => (
   <svg
     className="w-6 h-6"
@@ -64,13 +62,11 @@ const SendIcon = () => (
     ></path>
   </svg>
 );
-
 function ChatMessage({ message }) {
   const messageClass =
     message.sender === "ai"
       ? "bg-slate-200 text-slate-800 self-start"
       : "bg-blue-600 text-white self-end";
-
   return (
     <div
       className={`p-3 rounded-xl max-w-lg mx-4 my-2 shadow-sm ${messageClass}`}
@@ -86,25 +82,39 @@ function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
-  const [sessionId, setSessionId] = useState("guest_room_101");
+  const [sessionId, setSessionId] = useState(null);
   const recognitionRef = useRef(null);
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
 
-  // Simulated guest accounts for testing
-  const simulatedGuests = [
-    { id: "guest_room_101", name: "Guest (Room 101)" },
-    { id: "guest_room_205", name: "Guest (Room 205)" },
-    { id: "guest_vip_suite", name: "Guest (VIP Suite)" },
-  ];
-
-  // Load chat history and establish socket connection when session changes
   useEffect(() => {
+    let currentSessionId = localStorage.getItem("sessionId");
+    if (!currentSessionId) {
+      currentSessionId = crypto.randomUUID();
+      localStorage.setItem("sessionId", currentSessionId);
+    }
+    setSessionId(currentSessionId);
+  }, []);
+
+  // 2. Wrap the 'speak' function in useCallback
+  const speak = useCallback(
+    (text) => {
+      if (isMuted || !window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.speak(utterance);
+    },
+    [isMuted],
+  ); // It only needs to be recreated if 'isMuted' changes
+
+  useEffect(() => {
+    if (!sessionId) return;
+
     const fetchHistory = async () => {
       setIsLoading(true);
       try {
         const response = await fetch(
-          `http://localhost:3000/api/history/${sessionId}`,
+          `https://ai-chatbot-hospitality-backend.onrender.com//api/history/${sessionId}`,
         );
         const historyData = await response.json();
         const formattedMessages = historyData.map((item) => ({
@@ -116,7 +126,7 @@ function ChatPage() {
           setMessages([
             {
               sender: "ai",
-              text: `Hello! Welcome to your personal AI concierge for ${sessionId.replace(/_/g, " ")}. How can I help?`,
+              text: `Hello! Welcome to your personal AI concierge. How can I help?`,
             },
           ]);
         } else {
@@ -125,7 +135,7 @@ function ChatPage() {
       } catch (error) {
         console.error("Failed to fetch history:", error);
         setMessages([
-          { sender: "ai", text: "Sorry, I could not load the chat history." },
+          { sender: "ai", text: "Sorry, I could not load your chat history." },
         ]);
       } finally {
         setIsLoading(false);
@@ -133,14 +143,13 @@ function ChatPage() {
     };
     fetchHistory();
 
-    // Reset socket connection for new session
     if (socketRef.current) {
       socketRef.current.disconnect();
     }
-    const socket = io("http://localhost:3000");
+    const socket = io("https://ai-chatbot-hospitality-backend.onrender.com/");
     socketRef.current = socket;
     socket.on("connect", () => {
-      console.log("Chat socket connected:", socket.id);
+      console.log("✅ Chat socket connected:", socket.id);
       socket.emit("join_room", sessionId);
     });
     socket.on("proactive_message", (proactiveMessage) => {
@@ -152,7 +161,7 @@ function ChatPage() {
     return () => {
       socket.disconnect();
     };
-  }, [sessionId]);
+  }, [sessionId, speak]); // 3. Add 'speak' to the dependency array
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -162,15 +171,6 @@ function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  // Text-to-speech functionality
-  const speak = (text) => {
-    if (isMuted || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    window.speechSynthesis.speak(utterance);
-  };
-
-  // Initialize speech recognition
   useEffect(() => {
     const SpeechRecognition =
       window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -201,19 +201,23 @@ function ChatPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!input.trim() || !sessionId) return;
-    
     const userMessage = { sender: "user", text: input };
     setMessages((prev) => [...prev, userMessage]);
     const messageToSend = input;
     setInput("");
     setIsLoading(true);
-    
     try {
-      const response = await fetch("http://localhost:3000/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: messageToSend, sessionId: sessionId }),
-      });
+      const response = await fetch(
+        "https://ai-chatbot-hospitality-backend.onrender.com/chat",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: messageToSend,
+            sessionId: sessionId,
+          }),
+        },
+      );
       if (!response.ok) throw new Error("Network response was not ok");
       const data = await response.json();
       const aiMessage = { sender: "ai", text: data.reply };
@@ -254,17 +258,9 @@ function ChatPage() {
           </Link>
           <div>
             <h1 className="text-xl font-bold text-slate-800">AI Concierge</h1>
-            <select
-              value={sessionId}
-              onChange={(e) => setSessionId(e.target.value)}
-              className="text-xs text-slate-500 font-mono bg-transparent -ml-1 border-none focus:ring-0"
-            >
-              {simulatedGuests.map((guest) => (
-                <option key={guest.id} value={guest.id}>
-                  {guest.name}
-                </option>
-              ))}
-            </select>
+            <p className="text-xs text-slate-500 font-mono">
+              Session: {sessionId?.substring(0, 8)}...
+            </p>
           </div>
         </div>
         <button

@@ -171,12 +171,14 @@ router.post("/", async (req, res) => {
             checkOutDate: checkOut.toISOString().split("T")[0],
             numberOfGuests: args.numberOfGuests,
             specialRequests: args.roomPreference,
+            sessionId: sessionId,
           };
         } else {
           body = {
             roomNumber: args.roomNumber,
             requestType: args.requestType,
             details: args.details,
+            sessionId: sessionId,
           };
         }
         const apiResponse = await fetch(
