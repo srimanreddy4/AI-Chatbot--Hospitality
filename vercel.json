@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://ai-chatbot-hospitality-backend.onrender.com//api/:path*"
+    },
+    {
+      "source": "/chat/:path*",
+      "destination": "https://ai-chatbot-hospitality-backend.onrender.com//chat/:path*"
+    },
+    {
+      "source": "/socket.io/:path*",
+      "destination": "https://ai-chatbot-hospitality-backend.onrender.com//socket.io/:path*"
+    }
+  ]
+}
