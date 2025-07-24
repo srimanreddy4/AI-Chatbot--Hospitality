@@ -11,7 +11,7 @@ import chatRoutes from "./routes/chat.js";
 import voiceRoutes from "./routes/voice.js";
 const app = express();
 
-const allowedOrigins = ["http://localhost:5173"];
+const allowedOrigins = ["http://localhost:5173","https://ai-chatbot-hospitality.vercel.app"];
 
 const corsOptions = {
   origin: (origin, callback) => {
