@@ -70,7 +70,7 @@ router.post("/proactive-ping", async (req, res) => {
   try {
     const { sessionId, promptType } = req.body;
     const contextResponse = await fetch(
-      `http://localhost:3000/api/context/${sessionId}`,
+      `https://ai-chieftain-backend.onrender.com/api/context/${sessionId}`,
     );
     const contextData = await contextResponse.json();
 
