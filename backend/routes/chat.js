@@ -122,7 +122,7 @@ router.post("/", async (req, res) => {
 
     // Get user context for personalized responses
     const contextResponse = await fetch(
-      `http://localhost:3000/api/context/${sessionId}`,
+      `https://ai-chieftain-backend.onrender.com/${sessionId}`,
     );
     const contextData = await contextResponse.json();
 
@@ -182,7 +182,7 @@ router.post("/", async (req, res) => {
           };
         }
         const apiResponse = await fetch(
-          `http://localhost:3000/api/${apiEndpoint}`,
+          `https://ai-chieftain-backend.onrender.com/api/${apiEndpoint}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -207,7 +207,7 @@ router.post("/", async (req, res) => {
         console.log("Searching knowledge base for:", args.query);
 
         const faqResponse = await fetch(
-          `http://localhost:3000/api/faqs/search?query=${encodeURIComponent(args.query)}`,
+          `https://ai-chieftain-backend.onrender.com/api/faqs/search?query=${encodeURIComponent(args.query)}`,
         );
 
         let toolResult;
