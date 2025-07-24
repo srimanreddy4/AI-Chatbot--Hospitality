@@ -146,7 +146,7 @@ function ChatPage() {
     if (socketRef.current) {
       socketRef.current.disconnect();
     }
-    const socket = io("https://ai-chatbot-hospitality-backend.onrender.com/");
+    const socket = io("https://ai-chatbot-hospitality-backend.onrender.com");
     socketRef.current = socket;
     socket.on("connect", () => {
       console.log("✅ Chat socket connected:", socket.id);
