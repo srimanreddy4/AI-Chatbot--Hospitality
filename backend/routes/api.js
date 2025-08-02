@@ -1,9 +1,9 @@
 import express from "express";
-import { Booking } from "../models/Booking.js";
-import { ServiceRequest } from "../models/ServiceRequest.js";
-import { UserSession } from "../models/UserSession.js";
-import { HotelFAQ } from "../models/HotelFAQ.js";
-import { Appointment } from "../models/Appointment.js";
+import { Booking } from "../models/booking.js";
+import { ServiceRequest } from "../models/servicerequest.js";
+import { UserSession } from "../models/usersession.js";
+import { HotelFAQ } from "../models/hotelfAQ.js";
+import { Appointment } from "../models/appointment.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const router = express.Router();
@@ -38,11 +38,9 @@ router.post("/proactive-ping", async (req, res) => {
       );
       prompt = `You are an AI Hotel Concierge. A user has an upcoming '${appointment.serviceName}' appointment at ${time}. Generate the exact, single message to send them as a friendly reminder. Do not offer options or variations.`;
     } else {
-      return res
-        .status(404)
-        .json({
-          message: `No relevant data found to send a '${promptType}' reminder for this guest.`,
-        });
+      return res.status(404).json({
+        message: `No relevant data found to send a '${promptType}' reminder for this guest.`,
+      });
     }
 
     const result = await model.generateContent(prompt);
@@ -59,12 +57,10 @@ router.post("/proactive-ping", async (req, res) => {
       await session.save();
       const io = req.app.get("socketio");
       io.to(sessionId).emit("proactive_message", aiMessage);
-      res
-        .status(200)
-        .json({
-          message: "Proactive message sent successfully!",
-          data: aiMessage,
-        });
+      res.status(200).json({
+        message: "Proactive message sent successfully!",
+        data: aiMessage,
+      });
     } else {
       throw new Error("Session not found");
     }
@@ -189,12 +185,10 @@ router.post("/services", async (req, res) => {
       .json({ message: "Service request created!", data: newServiceRequest });
   } catch (error) {
     console.error("❌ Error creating service request:", error);
-    res
-      .status(500)
-      .json({
-        message: "Failed to create service request",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "Failed to create service request",
+      error: error.message,
+    });
   }
 });
 

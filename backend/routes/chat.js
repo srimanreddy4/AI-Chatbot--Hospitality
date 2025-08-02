@@ -1,7 +1,7 @@
 import express from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import "dotenv/config";
-import { UserSession } from "../models/UserSession.js";
+import { UserSession } from "../models/usersession.js";
 
 const router = express.Router();
 
