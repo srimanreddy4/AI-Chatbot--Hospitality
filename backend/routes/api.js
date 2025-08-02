@@ -2,7 +2,7 @@ import express from "express";
 import { Booking } from "../models/booking.js";
 import { ServiceRequest } from "../models/servicerequest.js";
 import { UserSession } from "../models/usersession.js";
-import { HotelFAQ } from "../models/hotelfAQ.js";
+import { HotelFAQ } from "../models/hotelfaq.js";
 import { Appointment } from "../models/appointment.js";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
