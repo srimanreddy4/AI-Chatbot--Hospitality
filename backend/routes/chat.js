@@ -1,18 +1,20 @@
 import express from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import "dotenv/config";
-import { UserSession } from "../models/usersession.js";
+import { UserSession } from "../models/UserSession.js";
 
 const router = express.Router();
 
-// Define the AI tools/functions available to the model
+// This will be your Render URL in production, or localhost in development
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:3000";
+
 const tools = [
   {
     functionDeclarations: [
       {
         name: "create_booking",
         description:
-          "Creates a hotel room booking. Must collect user name, check-in date, and number of nights before proceeding. Can ask for additional preferences.",
+          "Creates a hotel room booking. Before calling this function, if the user has not provided their name, check-in date, and number of nights, you MUST ask them for the missing information. You can also ask clarifying questions about their preferences, such as the number of guests or if they want a room with a view.",
         parameters: {
           type: "object",
           properties: {
@@ -23,7 +25,7 @@ const tools = [
             checkInDate: {
               type: "string",
               description:
-                "The check-in date in YYYY-MM-DD format. The current date is July 23, 2025.",
+                "The check-in date in YYYY-MM-DD format. The current date is August 2, 2025.",
             },
             numberOfNights: {
               type: "number",
@@ -85,7 +87,7 @@ const tools = [
       {
         name: "request_human_assistance",
         description:
-          "Use this function if the user is asking a question you cannot answer with your other tools, or if they are expressing significant frustration.",
+          "Use this function if the user is asking a question you cannot answer with your other tools, or if they are expressing significant frustration (e.g., multiple negative sentiment messages).",
         parameters: {
           type: "object",
           properties: {
@@ -104,7 +106,7 @@ const tools = [
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const model = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash",
+  model: "gemini-1.5-flash",
   tools,
   systemInstruction:
     "You are a helpful hotel concierge AI. You have tools for booking, service requests, searching FAQs, and requesting a human. Use the user's CONTEXT and HISTORY to provide personalized responses. If you cannot help or the user is frustrated, use the 'request_human_assistance' tool. Always respond with a JSON object containing 'reply' and 'sentiment'.",
@@ -120,9 +122,8 @@ router.post("/", async (req, res) => {
         .json({ error: "Message and sessionId are required" });
     }
 
-    // Get user context for personalized responses
     const contextResponse = await fetch(
-      `https://ai-chieftain-backend.onrender.com/${sessionId}`,
+      `${BACKEND_URL}/api/context/${sessionId}`,
     );
     const contextData = await contextResponse.json();
 
@@ -131,11 +132,10 @@ router.post("/", async (req, res) => {
     if (contextData.latestBooking || contextData.recentRequests?.length) {
       contextString = `
         Current Booking: ${contextData.latestBooking ? `User ${contextData.latestBooking.userName} is staying until ${new Date(contextData.latestBooking.checkOutDate).toDateString()}.` : "None."}
-        Recent Service Requests: ${contextData.recentRequests.map((r) => r.details).join(", ") || "None."}
+        Recent Service Requests: ${contextData.recentRequests?.map((r) => r.details).join(", ") || "None."}
         `;
     }
 
-    // Load or create user session
     let session = await UserSession.findOne({ sessionId });
     if (!session) {
       session = new UserSession({ sessionId, history: [] });
@@ -146,9 +146,7 @@ router.post("/", async (req, res) => {
       parts: item.parts.map((part) => ({ text: part.text })),
     }));
 
-    const chat = model.startChat({
-      history: cleanHistory,
-    });
+    const chat = model.startChat({ history: cleanHistory });
 
     const augmentedMessage = `CONTEXT: ${contextString}\n\nUSER QUESTION: ${message}`;
 
@@ -158,37 +156,52 @@ router.post("/", async (req, res) => {
 
     if (call) {
       const { name, args } = call;
-      if (name === "create_booking" || name === "create_service_request") {
-        let apiEndpoint = name === "create_booking" ? "bookings" : "services";
-        let body = {};
-        if (name === "create_booking") {
-          const checkIn = new Date(args.checkInDate);
-          const checkOut = new Date(checkIn);
-          checkOut.setDate(checkIn.getDate() + args.numberOfNights);
-          body = {
-            userName: args.userName,
-            checkInDate: args.checkInDate,
-            checkOutDate: checkOut.toISOString().split("T")[0],
-            numberOfGuests: args.numberOfGuests,
-            specialRequests: args.roomPreference,
-            sessionId: sessionId,
-          };
-        } else {
-          body = {
-            roomNumber: args.roomNumber,
-            requestType: args.requestType,
-            details: args.details,
-            sessionId: sessionId,
-          };
-        }
-        const apiResponse = await fetch(
-          `https://ai-chieftain-backend.onrender.com/api/${apiEndpoint}`,
+
+      if (name === "create_booking") {
+        const checkIn = new Date(args.checkInDate);
+        const checkOut = new Date(checkIn);
+        checkOut.setDate(checkIn.getDate() + args.numberOfNights);
+
+        const body = {
+          userName: args.userName,
+          checkInDate: args.checkInDate,
+          checkOutDate: checkOut.toISOString().split("T")[0],
+          numberOfGuests: args.numberOfGuests,
+          specialRequests: args.roomPreference,
+          sessionId: sessionId,
+        };
+
+        const apiResponse = await fetch(`${BACKEND_URL}/api/bookings`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!apiResponse.ok)
+          throw new Error(`API call failed with status: ${apiResponse.status}`);
+        const apiData = await apiResponse.json();
+        const finalResult = await chat.sendMessage([
           {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
+            functionResponse: {
+              name,
+              response: { success: true, details: apiData.data },
+            },
           },
-        );
+        ]);
+        const textResponse = finalResult.response.text();
+        const cleanedText = textResponse.replace(/```json\n|```/g, "").trim();
+        jsonResponse = JSON.parse(cleanedText);
+      } else if (name === "create_service_request") {
+        const body = {
+          roomNumber: args.roomNumber,
+          requestType: args.requestType,
+          details: args.details,
+          sessionId: sessionId,
+        };
+        const apiResponse = await fetch(`${BACKEND_URL}/api/services`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
         if (!apiResponse.ok)
           throw new Error(`API call failed with status: ${apiResponse.status}`);
         const apiData = await apiResponse.json();
@@ -204,10 +217,8 @@ router.post("/", async (req, res) => {
         const cleanedText = textResponse.replace(/```json\n|```/g, "").trim();
         jsonResponse = JSON.parse(cleanedText);
       } else if (name === "search_hotel_faqs") {
-        console.log("Searching knowledge base for:", args.query);
-
         const faqResponse = await fetch(
-          `https://ai-chieftain-backend.onrender.com/api/faqs/search?query=${encodeURIComponent(args.query)}`,
+          `${BACKEND_URL}/api/faqs/search?query=${encodeURIComponent(args.query)}`,
         );
 
         let toolResult;
@@ -229,32 +240,24 @@ router.post("/", async (req, res) => {
             },
           },
         ]);
-
         const textResponse = finalResult.response.text();
         const cleanedText = textResponse.replace(/```json\n|```/g, "").trim();
         jsonResponse = JSON.parse(cleanedText);
       } else if (name === "request_human_assistance") {
-        console.log("Requesting human assistance for:", args.reason);
-
-        // Get recent conversation history for context
         const sessionForHistory = await UserSession.findOne({ sessionId });
         const recentHistory = sessionForHistory
           ? sessionForHistory.history.slice(-5)
           : [];
-
-        // Notify dashboard of assistance request
         const io = req.app.get("socketio");
         io.emit("human_assistance_needed", {
           sessionId,
           reason: args.reason,
           history: recentHistory,
         });
-
         const toolResult = {
           success: true,
           message: "A human agent has been notified.",
         };
-
         const finalResult = await chat.sendMessage([
           {
             functionResponse: {
@@ -263,7 +266,6 @@ router.post("/", async (req, res) => {
             },
           },
         ]);
-
         const textResponse = finalResult.response.text();
         const cleanedText = textResponse.replace(/```json\n|```/g, "").trim();
         jsonResponse = JSON.parse(cleanedText);
@@ -274,7 +276,6 @@ router.post("/", async (req, res) => {
       jsonResponse = JSON.parse(cleanedText);
     }
 
-    // Save the conversation to session history
     session.history.push({ role: "user", parts: [{ text: message }] });
     session.history.push({
       role: "model",
@@ -283,15 +284,9 @@ router.post("/", async (req, res) => {
     });
     await session.save();
 
-    console.log(
-      `Sentiment for session ${sessionId}: ${jsonResponse.sentiment}`,
-    );
-    console.log(
-      `Session ${sessionId} history now has ${session.history.length} messages.`,
-    );
     res.json({ reply: jsonResponse.reply });
   } catch (error) {
-    console.error("Error in chat logic:", error);
+    console.error("❌ Error in chat logic:", error);
     res.status(500).json({ error: "Something went wrong with the AI chat." });
   }
 });

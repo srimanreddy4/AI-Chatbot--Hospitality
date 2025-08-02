@@ -114,7 +114,7 @@ function ChatPage() {
       setIsLoading(true);
       try {
         const response = await fetch(
-          `https://ai-chatbot-hospitality-backend.onrender.com//api/history/${sessionId}`,
+          `https://ai-chatbot-hospitality-backend.onrender.com/api/history/${sessionId}`,
         );
         const historyData = await response.json();
         const formattedMessages = historyData.map((item) => ({
