@@ -14,7 +14,7 @@ const app = express();
 
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://ai-chatbot-hospitality.vercel.app/", // Your Vercel URL
+  "https://ai-chatbot-hospitality.vercel.app", // Your Vercel URL
 ];
 
 const corsOptions = {
